@@ -1,0 +1,32 @@
+.themeToggle {
+  background: none;
+  border: 1px solid var(--border-color);
+  border-radius: 0.375rem;
+  padding: 0.5rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  background-color: var(--bg-secondary);
+}
+
+.themeToggle:hover {
+  background-color: var(--border-color);
+  transform: scale(1.05);
+}
+
+.icon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+@media (max-width: 768px) {
+  .themeToggle {
+    padding: 0.375rem;
+  }
+  
+  .icon {
+    font-size: 0.875rem;
+  }
+}

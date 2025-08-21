@@ -1,0 +1,24 @@
+{
+  "Utkarsh": {
+    "C": {
+      "completed_topics": [],
+      "quiz_scores": {}
+    },
+    "C++": {
+      "completed_topics": [],
+      "quiz_scores": {}
+    },
+    "C#": {
+      "completed_topics": [],
+      "quiz_scores": {}
+    },
+    "Java": {
+      "completed_topics": [],
+      "quiz_scores": {}
+    },
+    "Python": {
+      "completed_topics": [],
+      "quiz_scores": {}
+    }
+  }
+}

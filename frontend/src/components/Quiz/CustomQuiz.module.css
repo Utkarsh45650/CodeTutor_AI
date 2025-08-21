@@ -1,0 +1,286 @@
+.customQuizContainer {
+  min-height: calc(100vh - 60px);
+  padding: 2rem 0;
+}
+
+.loadingContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  gap: 1rem;
+}
+
+.insufficientContainer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  padding: 2rem;
+}
+
+.insufficientCard {
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 1rem;
+  padding: 3rem;
+  text-align: center;
+  max-width: 600px;
+  box-shadow: 0 10px 25px var(--shadow);
+}
+
+.insufficientCard h2 {
+  color: var(--color-primary);
+  margin-bottom: 1rem;
+  font-size: 2rem;
+}
+
+.insufficientCard p {
+  color: var(--text-secondary);
+  margin-bottom: 1rem;
+  line-height: 1.6;
+}
+
+.topicsList {
+  background-color: var(--bg-secondary);
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  margin: 2rem 0;
+}
+
+.topicsList h3 {
+  color: var(--text-primary);
+  margin-bottom: 1rem;
+  text-align: left;
+}
+
+.topicItem {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  text-align: left;
+}
+
+.completed {
+  color: var(--color-accent);
+}
+
+.incomplete {
+  color: var(--text-secondary);
+}
+
+.header {
+  margin-bottom: 3rem;
+  text-align: center;
+}
+
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  justify-content: center;
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.breadcrumb a {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+.breadcrumb a:hover {
+  text-decoration: underline;
+}
+
+.header h1 {
+  font-size: 2.5rem;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+}
+
+.subtitle {
+  font-size: 1.125rem;
+  color: var(--text-secondary);
+}
+
+.selectionSection {
+  margin-bottom: 3rem;
+}
+
+.selectionSection h2 {
+  font-size: 1.75rem;
+  color: var(--text-primary);
+  margin-bottom: 0.5rem;
+}
+
+.selectionNote {
+  color: var(--text-secondary);
+  margin-bottom: 2rem;
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.topicsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1rem;
+}
+
+.topicCard {
+  background-color: var(--bg-primary);
+  border: 2px solid var(--border-color);
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px var(--shadow);
+}
+
+.available {
+  cursor: pointer;
+}
+
+.available:hover {
+  border-color: var(--color-primary);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px var(--shadow);
+}
+
+.locked {
+  opacity: 0.6;
+  cursor: not-allowed;
+  background-color: var(--bg-secondary);
+}
+
+.selected {
+  border-color: var(--color-primary);
+  background-color: var(--color-primary);
+  color: white;
+}
+
+.selected .topicTitle,
+.selected .statusCompleted,
+.selected .quizScore {
+  color: white;
+}
+
+.topicHeader {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.topicIcon {
+  font-size: 1.5rem;
+}
+
+.topicTitle {
+  font-size: 1.125rem;
+  color: var(--text-primary);
+  margin: 0;
+  flex: 1;
+}
+
+.topicStatus {
+  margin-bottom: 0.5rem;
+}
+
+.statusCompleted {
+  color: var(--color-accent);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.statusLocked {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+.quizScore {
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+}
+
+.summarySection {
+  margin-bottom: 3rem;
+}
+
+.summaryCard {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 0.5rem;
+  padding: 2rem;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.summaryCard h3 {
+  color: var(--text-primary);
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.summaryDetails {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.summaryItem {
+  display: flex;
+  justify-content: space-between;
+  color: var(--text-primary);
+  font-size: 0.9375rem;
+}
+
+.summaryItem strong {
+  color: var(--text-primary);
+}
+
+.actionsSection {
+  text-align: center;
+}
+
+.actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 768px) {
+  .customQuizContainer {
+    padding: 1rem 0;
+  }
+  
+  .header h1 {
+    font-size: 2rem;
+  }
+  
+  .topicsGrid {
+    grid-template-columns: 1fr;
+  }
+  
+  .summaryItem {
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+  
+  .actions {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .actions .btn {
+    width: 100%;
+    max-width: 300px;
+  }
+  
+  .insufficientCard {
+    padding: 2rem 1rem;
+  }
+}
