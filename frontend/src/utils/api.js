@@ -75,10 +75,15 @@ class ApiService {
   }
 
   // Quiz methods
-  async generateQuiz(language, topic, difficulty = 'Easy') {
+  async generateQuiz(language, topic, difficulty = 'Easy', numQuestions = 5) {
     return this.request('/quiz/generate', {
       method: 'POST',
-      body: JSON.stringify({ language, topic, difficulty })
+      body: JSON.stringify({ 
+        language, 
+        topic, 
+        difficulty,
+        num_questions: numQuestions
+      })
     });
   }
 
@@ -99,6 +104,25 @@ class ApiService {
     return this.request('/quiz/custom', {
       method: 'POST',
       body: JSON.stringify({ language, topics })
+    });
+  }
+
+  // Progress tracking methods
+  async getTopicsWithProgress(language) {
+    return this.request(`/topics/${language}`);
+  }
+
+  async completeTutorial(language, topic) {
+    return this.request('/complete-tutorial', {
+      method: 'POST',
+      body: JSON.stringify({ language, topic })
+    });
+  }
+
+  async completeQuiz(language, topic, score) {
+    return this.request('/complete-quiz', {
+      method: 'POST',
+      body: JSON.stringify({ language, topic, score })
     });
   }
 

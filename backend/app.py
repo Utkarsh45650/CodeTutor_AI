@@ -4,6 +4,7 @@ from auth import auth_bp, token_required
 from tutor import tutor_bp
 from quiz import quiz_bp
 from compiler import compiler_bp
+from progress import progress_bp
 import os
 from dotenv import load_dotenv
 
@@ -19,6 +20,7 @@ app.register_blueprint(auth_bp, url_prefix='/api')
 app.register_blueprint(tutor_bp, url_prefix='/api')
 app.register_blueprint(quiz_bp, url_prefix='/api')
 app.register_blueprint(compiler_bp, url_prefix='/api')
+app.register_blueprint(progress_bp, url_prefix='/api')
 
 @app.route('/')
 def home():

@@ -1,6 +1,7 @@
 import os
 import google.generativeai as genai
 import json
+import re
 from typing import List, Dict, Any
 
 class AIService:
@@ -12,23 +13,45 @@ class AIService:
             self.model = None
         else:
             genai.configure(api_key=api_key)
-            self.model = genai.GenerativeModel('gemini-2.5-flash')
+            # Use the latest model with generation config for better control
+            generation_config = {
+                "temperature": 0.7,
+                "top_p": 0.8,
+                "top_k": 40,
+                "max_output_tokens": 2048,
+            }
+            self.model = genai.GenerativeModel(
+                model_name='gemini-1.5-flash',
+                generation_config=generation_config
+            )
     
     def _clean_json_response(self, response_text: str) -> str:
-        """Clean JSON response by removing markdown code blocks"""
-        # Remove markdown code blocks if present
-        if response_text.strip().startswith('```'):
-            # Find the first occurrence of ``` and remove it
-            start_idx = response_text.find('```')
-            if start_idx != -1:
-                # Find the end of the opening ```json or ```
-                end_start = response_text.find('\n', start_idx)
-                if end_start != -1:
+        """Clean JSON response by removing markdown code blocks and formatting issues"""
+        try:
+            # Remove markdown code blocks if present
+            text = response_text.strip()
+            
+            # Handle markdown code blocks
+            if text.startswith('```'):
+                # Find the first newline after ```
+                start_idx = text.find('\n')
+                if start_idx != -1:
                     # Find the closing ```
-                    end_idx = response_text.rfind('```')
-                    if end_idx != -1 and end_idx != start_idx:
-                        return response_text[end_start + 1:end_idx].strip()
-        return response_text.strip()
+                    end_idx = text.rfind('```')
+                    if end_idx != -1 and end_idx != 0:
+                        text = text[start_idx + 1:end_idx].strip()
+            
+            # Remove any extra whitespace and ensure it's valid JSON
+            text = re.sub(r'\s+', ' ', text)
+            text = text.replace('\n', '').replace('\r', '')
+            
+            # Try to parse to validate JSON
+            json.loads(text)
+            return text
+            
+        except (json.JSONDecodeError, Exception) as e:
+            print(f"JSON cleaning failed: {e}")
+            return response_text.strip()
         
     def generate_tutorial_content(self, language: str, topic: str) -> Dict[str, Any]:
         """Generate tutorial content for a specific programming topic"""
@@ -106,46 +129,83 @@ class AIService:
             return self._get_fallback_notes(language, topic)
     
     def generate_quiz_questions(self, language: str, topic: str, difficulty: str, num_questions: int = 5) -> List[Dict]:
-        """Generate quiz questions for a topic"""
+        """Generate quiz questions for a topic with improved error handling"""
         
         difficulty_descriptions = {
-            'Easy': 'Basic concepts, simple multiple choice',
-            'Medium': 'Intermediate concepts, mix of MCQ and simple coding',
-            'Hard': 'Advanced concepts, complex MCQ and coding problems',
-            'Nightmare': 'Expert level, complex coding and debugging challenges'
+            'Easy': 'Basic concepts, simple multiple choice questions',
+            'Medium': 'Intermediate concepts, mix of MCQ and simple coding problems',
+            'Hard': 'Advanced concepts, complex MCQ and coding challenges',
+            'Expert': 'Expert level, complex coding and debugging problems'
         }
         
         prompt = f"""
-        Generate {num_questions} quiz questions for {topic} in {language} programming.
+        Generate exactly {num_questions} quiz questions for "{topic}" in {language} programming.
         
-        Difficulty: {difficulty} - {difficulty_descriptions.get(difficulty, '')}
+        Difficulty Level: {difficulty} - {difficulty_descriptions.get(difficulty, 'Mixed difficulty')}
         
-        Question types:
-        - Easy: Only MCQ questions
-        - Medium: 70% MCQ, 30% coding
-        - Hard: 50% MCQ, 50% coding/debugging
-        - Nightmare: 30% MCQ, 70% coding/debugging
+        Requirements:
+        1. Each question must test understanding of {topic}
+        2. Provide clear, unambiguous questions
+        3. Include detailed explanations for each answer
+        4. For MCQ questions, provide 4 options with exactly one correct answer
+        5. Make sure code examples are syntactically correct
         
-        Format each question as JSON:
-        {{
-            "type": "mcq|coding|debugging",
-            "question": "Question text",
-            "options": ["A", "B", "C", "D"] (for MCQ only),
-            "correct": 0 (index for MCQ) or "solution description" (for coding),
-            "explanation": "Why this is correct..."
-        }}
+        Return ONLY a JSON array in this exact format:
+        [
+            {{
+                "type": "mcq",
+                "question": "Clear question text about {topic}",
+                "options": ["Option A", "Option B", "Option C", "Option D"],
+                "correct": 0,
+                "explanation": "Detailed explanation of why this answer is correct"
+            }}
+        ]
         
-        Return as JSON array of questions.
+        Generate {num_questions} questions following this format exactly.
         """
         
         try:
             if not self.model:
-                raise Exception("Google Gemini API not configured")
-                
-            response = self.model.generate_content(prompt)
-            content = self._clean_json_response(response.text)
-            return json.loads(content)
+                print("AI model not available, using fallback questions")
+                return self._get_fallback_questions(language, topic, difficulty)
             
+            print(f"Generating {num_questions} quiz questions for {language} - {topic} ({difficulty})")
+            response = self.model.generate_content(prompt)
+            
+            if not response or not response.text:
+                print("Empty response from AI, using fallback")
+                return self._get_fallback_questions(language, topic, difficulty)
+            
+            print("AI response received, cleaning JSON...")
+            cleaned_content = self._clean_json_response(response.text)
+            
+            print(f"Parsing JSON: {cleaned_content[:100]}...")
+            questions = json.loads(cleaned_content)
+            
+            # Validate the response
+            if not isinstance(questions, list) or len(questions) == 0:
+                print("Invalid question format, using fallback")
+                return self._get_fallback_questions(language, topic, difficulty)
+            
+            # Validate each question structure
+            valid_questions = []
+            for q in questions:
+                if (isinstance(q, dict) and 
+                    'type' in q and 
+                    'question' in q and 
+                    'explanation' in q):
+                    valid_questions.append(q)
+            
+            if len(valid_questions) == 0:
+                print("No valid questions found, using fallback")
+                return self._get_fallback_questions(language, topic, difficulty)
+            
+            print(f"Successfully generated {len(valid_questions)} questions")
+            return valid_questions[:num_questions]  # Ensure we don't exceed requested number
+            
+        except json.JSONDecodeError as e:
+            print(f"JSON parsing error: {e}")
+            return self._get_fallback_questions(language, topic, difficulty)
         except Exception as e:
             print(f"AI API Error: {e}")
             return self._get_fallback_questions(language, topic, difficulty)

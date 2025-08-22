@@ -1,42 +1,61 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import apiService from '../../utils/api';
-import CodeEditor from '../Compiler/CodeEditor';
-import styles from './QuizInterface.module.css';
+import styles from './QuizInterface_enhanced.module.css';
 
 const QuizInterface = () => {
   const { language, topic } = useParams();
-  const navigate = useNavigate();
+  
+  // Quiz state
   const [quiz, setQuiz] = useState(null);
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState([]);
   const [timeLeft, setTimeLeft] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [quizResults, setQuizResults] = useState(null);
+  
+  // UI state
+  const [phase, setPhase] = useState('setup'); // setup, generating, active, completed, results
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  
+  // Quiz configuration
   const [difficulty, setDifficulty] = useState('Easy');
-  const [quizStarted, setQuizStarted] = useState(false);
+  const [numQuestions, setNumQuestions] = useState(5);
 
+  // Timer effect
   useEffect(() => {
-    if (quizStarted && timeLeft > 0) {
+    if (phase === 'active' && timeLeft > 0) {
       const timer = setTimeout(() => {
         setTimeLeft(timeLeft - 1);
       }, 1000);
       return () => clearTimeout(timer);
-    } else if (timeLeft === 0 && quizStarted) {
+    } else if (timeLeft === 0 && phase === 'active') {
       handleSubmitQuiz();
     }
-  }, [timeLeft, quizStarted]);
+  }, [timeLeft, phase]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const startQuiz = async () => {
+  const generateQuiz = async () => {
     try {
+      setPhase('generating');
       setLoading(true);
-      const response = await apiService.generateQuiz(language, topic, difficulty);
-      setQuiz(response);
-      setAnswers(new Array(response.questions.length).fill(''));
-      setTimeLeft(response.time_limit * 60); // Convert minutes to seconds
-      setQuizStarted(true);
+      setError('');
+      
+      const response = await apiService.generateQuiz(language, topic, difficulty, numQuestions);
+      
+      if (response.success) {
+        setQuiz(response);
+        // Initialize answers array with null values instead of empty strings for better checking
+        setAnswers(new Array(response.questions.length).fill(null));
+        setTimeLeft(response.time_limit * 60); // Convert minutes to seconds
+        setPhase('active');
+        console.log('Quiz loaded:', response);
+        console.log('Questions:', response.questions);
+      } else {
+        throw new Error('Failed to generate quiz');
+      }
     } catch (error) {
-      setError('Failed to generate quiz');
+      setError(error.message || 'Failed to generate quiz. Please try again.');
+      setPhase('setup');
     } finally {
       setLoading(false);
     }
@@ -46,22 +65,30 @@ const QuizInterface = () => {
     const newAnswers = [...answers];
     newAnswers[currentQuestion] = value;
     setAnswers(newAnswers);
+    console.log(`Question ${currentQuestion + 1}: Selected answer index ${value}`);
   };
 
-  const handleNext = () => {
+  const nextQuestion = () => {
     if (currentQuestion < quiz.questions.length - 1) {
+      console.log(`Moving from question ${currentQuestion + 1} to ${currentQuestion + 2}`);
       setCurrentQuestion(currentQuestion + 1);
     }
   };
 
-  const handlePrevious = () => {
+  const previousQuestion = () => {
     if (currentQuestion > 0) {
+      console.log(`Moving from question ${currentQuestion + 1} to ${currentQuestion}`);
       setCurrentQuestion(currentQuestion - 1);
     }
   };
 
   const handleSubmitQuiz = async () => {
     try {
+      setPhase('completed');
+      setLoading(true);
+      
+      console.log('Submitting quiz with answers:', answers);
+      
       const response = await apiService.submitQuiz(
         quiz.quiz_id,
         answers,
@@ -70,21 +97,15 @@ const QuizInterface = () => {
         difficulty
       );
       
-      // Update progress if quiz is passed
-      if (response.passed) {
-        await apiService.updateProgress(language, topic, response.score);
-      }
-      
-      navigate('/quiz-results', { 
-        state: { 
-          results: response,
-          language,
-          topic,
-          difficulty 
-        } 
-      });
+      console.log('Quiz submission response:', response);
+      setQuizResults(response);
+      setPhase('results');
     } catch (error) {
-      setError('Failed to submit quiz');
+      console.error('Quiz submission error:', error);
+      setError('Failed to submit quiz. Please try again.');
+      setPhase('active');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -94,65 +115,119 @@ const QuizInterface = () => {
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
-  const getCurrentQuestion = () => {
-    return quiz?.questions[currentQuestion];
+  const getDifficultyColor = (diff) => {
+    const colors = {
+      'Easy': '#4CAF50',
+      'Medium': '#FF9800',
+      'Hard': '#F44336',
+      'Expert': '#9C27B0'
+    };
+    return colors[diff] || '#666';
   };
 
-  if (!quizStarted) {
+  const restartQuiz = () => {
+    setQuiz(null);
+    setCurrentQuestion(0);
+    setAnswers([]);
+    setTimeLeft(0);
+    setQuizResults(null);
+    setPhase('setup');
+    setError('');
+    setLoading(false);
+    console.log('Quiz restarted');
+  };
+
+  // Setup Phase
+  if (phase === 'setup') {
     return (
-      <div className={styles.quizSetup}>
-        <div className="page-container">
-          <div className={styles.setupCard}>
-            <h1>Quiz Setup</h1>
-            <p>Ready to test your knowledge of <strong>{topic}</strong> in {language}?</p>
-            
-            <div className={styles.difficultySelection}>
-              <h3>Select Difficulty Level:</h3>
+      <div className={styles.container}>
+        <div className={styles.header}>
+          <Link to={`/dashboard`} className={styles.backLink}>
+            ← Back to Dashboard
+          </Link>
+          <h1 className={styles.title}>Quiz Setup</h1>
+        </div>
+
+        <div className={styles.setupCard}>
+          <div className={styles.topicInfo}>
+            <h2>{language} - {topic}</h2>
+            <p>Configure your quiz settings below:</p>
+          </div>
+
+          <div className={styles.configSection}>
+            <div className={styles.configGroup}>
+              <label className={styles.configLabel}>Difficulty Level:</label>
               <div className={styles.difficultyOptions}>
-                {['Easy', 'Medium', 'Hard', 'Nightmare'].map(level => (
+                {['Easy', 'Medium', 'Hard', 'Expert'].map((level) => (
                   <button
                     key={level}
+                    className={`${styles.difficultyBtn} ${difficulty === level ? styles.active : ''}`}
                     onClick={() => setDifficulty(level)}
-                    className={`btn ${difficulty === level ? 'btn-primary' : 'btn-secondary'}`}
+                    style={{
+                      borderColor: difficulty === level ? getDifficultyColor(level) : '#ddd',
+                      backgroundColor: difficulty === level ? getDifficultyColor(level) : 'transparent',
+                      color: difficulty === level ? 'white' : getDifficultyColor(level)
+                    }}
                   >
                     {level}
                   </button>
                 ))}
               </div>
-              
-              <div className={styles.difficultyInfo}>
-                {difficulty === 'Easy' && (
-                  <p>🟢 Basic multiple-choice questions on fundamental concepts</p>
-                )}
-                {difficulty === 'Medium' && (
-                  <p>🟡 Advanced MCQs + one coding problem</p>
-                )}
-                {difficulty === 'Hard' && (
-                  <p>🟠 Complex MCQs + multiple coding problems</p>
-                )}
-                {difficulty === 'Nightmare' && (
-                  <p>🔴 In-depth MCQs + complex coding + debugging challenges</p>
-                )}
-              </div>
+              <p className={styles.difficultyDescription}>
+                {difficulty === 'Easy' && 'Basic concepts with simple multiple choice questions'}
+                {difficulty === 'Medium' && 'Intermediate concepts with mixed question types'}
+                {difficulty === 'Hard' && 'Advanced concepts requiring deeper understanding'}
+                {difficulty === 'Expert' && 'Complex problems testing mastery of the topic'}
+              </p>
             </div>
-            
-            {error && (
-              <div className="error-message">
-                {error}
-              </div>
-            )}
-            
-            <div className={styles.setupActions}>
-              <Link to="/dashboard" className="btn btn-secondary">
-                Cancel
-              </Link>
-              <button 
-                onClick={startQuiz}
-                disabled={loading}
-                className="btn btn-primary"
+
+            <div className={styles.configGroup}>
+              <label className={styles.configLabel}>Number of Questions:</label>
+              <select
+                className={styles.questionSelect}
+                value={numQuestions}
+                onChange={(e) => setNumQuestions(parseInt(e.target.value))}
               >
-                {loading ? 'Generating Quiz...' : 'Start Quiz'}
-              </button>
+                <option value={3}>3 Questions (Quick)</option>
+                <option value={5}>5 Questions (Standard)</option>
+                <option value={8}>8 Questions (Comprehensive)</option>
+                <option value={10}>10 Questions (Extended)</option>
+              </select>
+              <p className={styles.timeEstimate}>
+                Estimated time: {((numQuestions * (difficulty === 'Easy' ? 2 : difficulty === 'Medium' ? 3 : difficulty === 'Hard' ? 5 : 8)) / 60 * 100) / 100} minutes
+              </p>
+            </div>
+          </div>
+
+          <button
+            className={styles.generateBtn}
+            onClick={generateQuiz}
+            disabled={loading}
+          >
+            {loading ? 'Generating Quiz...' : 'Generate Quiz'}
+          </button>
+
+          {error && (
+            <div className={styles.error}>
+              {error}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Generating Phase
+  if (phase === 'generating') {
+    return (
+      <div className={styles.container}>
+        <div className={styles.loadingCard}>
+          <div className={styles.spinner}></div>
+          <h2>Generating Your Quiz...</h2>
+          <p>Creating {numQuestions} {difficulty.toLowerCase()} questions about {topic}</p>
+          <div className={styles.loadingProgress}>
+            <div className={styles.progressBar}>
+              <div className={styles.progressFill}></div>
             </div>
           </div>
         </div>
@@ -160,140 +235,200 @@ const QuizInterface = () => {
     );
   }
 
-  if (loading) {
+  // Active Quiz Phase
+  if (phase === 'active' && quiz) {
+    const question = quiz.questions[currentQuestion];
+    const progress = ((currentQuestion + 1) / quiz.questions.length) * 100;
+    
+    console.log(`Displaying question ${currentQuestion + 1}:`, question);
+    console.log(`Current answers:`, answers);
+
     return (
-      <div className={styles.loadingContainer}>
-        <div className="loading-spinner"></div>
-        <p>Loading quiz...</p>
-      </div>
-    );
-  }
-
-  const currentQuestionData = getCurrentQuestion();
-  const progress = ((currentQuestion + 1) / quiz.questions.length) * 100;
-
-  return (
-    <div className={styles.quizInterface}>
-      <div className="page-container">
-        <header className={styles.header}>
+      <div className={styles.container}>
+        <div className={styles.quizHeader}>
           <div className={styles.quizInfo}>
-            <h1>{language} - {topic} Quiz</h1>
-            <span className={styles.difficulty}>Difficulty: {difficulty}</span>
-          </div>
-          
-          <div className={styles.timer}>
-            <span className={timeLeft < 300 ? styles.timerWarning : ''}>
-              ⏰ {formatTime(timeLeft)}
+            <h2>{quiz.language} - {quiz.topic}</h2>
+            <span className={styles.difficulty} style={{ color: getDifficultyColor(quiz.difficulty) }}>
+              {quiz.difficulty}
             </span>
           </div>
-        </header>
+          <div className={styles.quizMeta}>
+            <div className={styles.timer}>
+              ⏱️ {formatTime(timeLeft)}
+            </div>
+            <div className={styles.questionCounter}>
+              {currentQuestion + 1} / {quiz.questions.length}
+            </div>
+          </div>
+        </div>
 
-        <div className={styles.progressSection}>
+        <div className={styles.progressContainer}>
           <div className={styles.progressBar}>
             <div 
-              className={styles.progressFill}
+              className={styles.progressFill} 
               style={{ width: `${progress}%` }}
             ></div>
           </div>
-          <span className={styles.progressText}>
-            Question {currentQuestion + 1} of {quiz.questions.length}
-          </span>
         </div>
 
-        <main className={styles.questionSection}>
-          <div className={styles.questionCard}>
-            <h2 className={styles.questionTitle}>
-              {currentQuestionData?.type === 'mcq' && '📝'}
-              {currentQuestionData?.type === 'coding' && '💻'}
-              {currentQuestionData?.type === 'debugging' && '🐛'}
-              Question {currentQuestion + 1}
-            </h2>
-            
-            <p className={styles.questionText}>
-              {currentQuestionData?.question}
-            </p>
-
-            {currentQuestionData?.type === 'mcq' && (
-              <div className={styles.mcqOptions}>
-                {currentQuestionData.options?.map((option, index) => (
-                  <button
-                    key={index}
-                    onClick={() => handleAnswerChange(index)}
-                    className={`${styles.optionButton} ${
-                      answers[currentQuestion] === index ? styles.selected : ''
-                    }`}
-                  >
-                    <span className={styles.optionLabel}>
-                      {String.fromCharCode(65 + index)}
-                    </span>
-                    {option}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {(currentQuestionData?.type === 'coding' || currentQuestionData?.type === 'debugging') && (
-              <div className={styles.codingSection}>
-                <CodeEditor
-                  language={language}
-                  onResult={(result) => {
-                    // Store the code as the answer
-                    handleAnswerChange(result.success ? 'correct' : 'incorrect');
-                  }}
-                />
-                <textarea
-                  value={answers[currentQuestion] || ''}
-                  onChange={(e) => handleAnswerChange(e.target.value)}
-                  placeholder="Enter your code solution here..."
-                  className={styles.codeAnswer}
-                  rows={10}
-                />
-              </div>
-            )}
+        <div className={styles.questionCard}>
+          <div className={styles.questionHeader}>
+            <span className={styles.questionNumber}>Question {currentQuestion + 1}</span>
+            <span className={styles.questionType}>{question.type.toUpperCase()}</span>
           </div>
-        </main>
+          
+          <div className={styles.questionText}>
+            {question.question}
+          </div>
 
-        <footer className={styles.navigation}>
+          {question.type === 'mcq' && (
+            <div className={styles.optionsContainer}>
+              {question.options.map((option, index) => (
+                <label key={index} className={styles.optionLabel}>
+                  <input
+                    type="radio"
+                    name={`question-${currentQuestion}`}
+                    value={index}
+                    checked={answers[currentQuestion] === index}
+                    onChange={() => handleAnswerChange(index)}
+                    className={styles.optionRadio}
+                  />
+                  <span className={styles.optionText}>{option}</span>
+                </label>
+              ))}
+            </div>
+          )}
+
+          {question.type === 'coding' && (
+            <div className={styles.codingContainer}>
+              <textarea
+                className={styles.codeTextarea}
+                placeholder="Write your code here..."
+                value={answers[currentQuestion] || ''}
+                onChange={(e) => handleAnswerChange(e.target.value)}
+              />
+            </div>
+          )}
+        </div>
+
+        <div className={styles.navigationButtons}>
           <button
-            onClick={handlePrevious}
+            className={styles.navBtn}
+            onClick={previousQuestion}
             disabled={currentQuestion === 0}
-            className="btn btn-secondary"
           >
             ← Previous
           </button>
           
-          <div className={styles.questionIndicators}>
-            {quiz.questions.map((_, index) => (
-              <button
-                key={index}
-                onClick={() => setCurrentQuestion(index)}
-                className={`${styles.indicator} ${
-                  index === currentQuestion ? styles.current : ''
-                } ${
-                  answers[index] !== '' ? styles.answered : ''
-                }`}
-              >
-                {index + 1}
-              </button>
-            ))}
-          </div>
-          
           {currentQuestion === quiz.questions.length - 1 ? (
             <button
+              className={styles.submitBtn}
               onClick={handleSubmitQuiz}
-              className="btn btn-success"
             >
               Submit Quiz
             </button>
           ) : (
             <button
-              onClick={handleNext}
-              className="btn btn-primary"
+              className={styles.navBtn}
+              onClick={nextQuestion}
             >
               Next →
             </button>
           )}
-        </footer>
+        </div>
+      </div>
+    );
+  }
+
+  // Results Phase
+  if (phase === 'results' && quizResults) {
+    return (
+      <div className={styles.container}>
+        <div className={styles.resultsCard}>
+          <div className={styles.resultsHeader}>
+            <h2>Quiz Results</h2>
+            <div className={styles.scoreDisplay}>
+              <div className={styles.mainScore}>
+                {quizResults.score} / {quizResults.total_questions}
+              </div>
+              <div className={styles.percentage}>
+                {quizResults.percentage}%
+              </div>
+              <div className={`${styles.passStatus} ${quizResults.passed ? styles.passed : styles.failed}`}>
+                {quizResults.passed ? '✅ Passed' : '❌ Failed'}
+              </div>
+            </div>
+          </div>
+
+          <div className={styles.performanceSection}>
+            <h3>Performance: {quizResults.performance_level}</h3>
+            <div className={styles.recommendations}>
+              <h4>Recommendations:</h4>
+              <ul>
+                {quizResults.recommendations.map((rec, index) => (
+                  <li key={index}>{rec}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          <div className={styles.detailedResults}>
+            <h3>Question Review:</h3>
+            {quizResults.detailed_results.map((result, index) => (
+              <div key={index} className={`${styles.questionResult} ${result.is_correct ? styles.correct : styles.incorrect}`}>
+                <div className={styles.questionResultHeader}>
+                  <span>Question {result.question_number}</span>
+                  <span className={styles.resultIcon}>
+                    {result.is_correct ? '✅' : '❌'}
+                  </span>
+                </div>
+                <div className={styles.questionResultText}>
+                  {result.question}
+                </div>
+                {result.options && (
+                  <div className={styles.answerComparison}>
+                    <div>Your answer: {result.options[result.user_answer]}</div>
+                    <div>Correct answer: {result.options[result.correct_answer]}</div>
+                  </div>
+                )}
+                <div className={styles.explanation}>
+                  <strong>Explanation:</strong> {result.explanation}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className={styles.resultsActions}>
+            <button
+              className={styles.actionBtn}
+              onClick={restartQuiz}
+            >
+              Take Quiz Again
+            </button>
+            <Link
+              to={`/tutor/${language}/${encodeURIComponent(topic)}`}
+              className={styles.actionBtn}
+            >
+              Review Tutorial
+            </Link>
+            <Link
+              to="/dashboard"
+              className={styles.actionBtn}
+            >
+              Back to Dashboard
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Loading state
+  return (
+    <div className={styles.container}>
+      <div className={styles.loadingCard}>
+        <div className={styles.spinner}></div>
+        <p>Loading quiz...</p>
       </div>
     </div>
   );
